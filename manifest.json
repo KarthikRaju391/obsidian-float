@@ -1,11 +1,11 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-float",
+	"name": "Obsdian Float",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "This is a plugin for obsidian which highlights a block of text or a word as you scroll down while reading.",
+	"author": "Karthik S Raju",
+	"authorUrl": "https://twitter.com/karthikraju391",
+	"fundingUrl": "",
 	"isDesktopOnly": false
 }

@@ -6,3 +6,10 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+.focus-content {
+    transition: all 200ms ease;
+    transform: scale(1.1);
+    box-shadow: rgba(0, 0, 0, 0.4) 0px 30px 90px;
+    border: 1px solid white;
+    border-radius: 0.5em;
+}
