@@ -9,7 +9,6 @@ interface MyPluginSettings {
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
-
 	onload() {
 		console.log("loading plugin");
 
