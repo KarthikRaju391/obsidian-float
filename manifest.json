@@ -3,7 +3,7 @@
 	"name": "Obsdian Float",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a plugin for Obsidian which enhances the current highlight feature of Obsidian by adding better animations to focus more on the highlights as you scroll down while in reading mode.",
+	"description": "Enhanced highlights for Obsidian",
 	"author": "Karthik S Raju",
 	"authorUrl": "https://twitter.com/karthikraju391",
 	"fundingUrl": "",
