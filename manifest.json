@@ -1,6 +1,6 @@
 {
-	"id": "obsidian-float",
-	"name": "Obsdian Float",
+	"id": "floating-highlights",
+	"name": "Floating Highlights",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Enhanced highlights for Obsidian",
