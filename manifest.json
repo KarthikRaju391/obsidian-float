@@ -6,6 +6,5 @@
 	"description": "Enhanced highlights for Obsidian",
 	"author": "Karthik S Raju",
 	"authorUrl": "https://twitter.com/karthikraju391",
-	"fundingUrl": "",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }
