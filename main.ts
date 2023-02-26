@@ -1,7 +1,5 @@
 import { Plugin } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
 interface MyPluginSettings {
 	//create a setting to enable or disable the plugin
 	mySetting: boolean;
