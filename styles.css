@@ -7,13 +7,13 @@ If your plugin does not need CSS, delete this file.
 
 */
 
-.focus {
+.float-highlights {
     transition: all 150ms ease;
-    margin: 0.5em 0 0.5em 0;
+    margin: 1em 0 1em 0 !important;
     transform: scale(1.1);
     box-shadow: rgba(0, 0, 0, 0.45) 0px 22px 53px 4px;
     border: 1px solid white;
-    padding: 2em !important;
+    padding: 1em !important;
     border-radius: 0.5em;
     list-style-type: none;
 }
