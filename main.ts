@@ -12,7 +12,7 @@ export default class FloatHighlightsPlugin extends Plugin {
 					entry.target.parentElement?.classList.remove("float-highlights");
 				}
 			});
-		}, { threshold: 0.2 });
+		}, { threshold: 0 });
 
 		this.registerMarkdownPostProcessor((element) => {
 			const highlightElements = element.querySelectorAll("mark");
