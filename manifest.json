@@ -1,9 +1,9 @@
 {
 	"id": "floating-highlights",
 	"name": "Floating Highlights",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Enhanced highlights for Obsidian",
+	"description": "Enhanced highlights for Obsidian with customizable animations and notes",
 	"author": "Karthik S Raju",
 	"authorUrl": "https://twitter.com/karthikraju391",
 	"isDesktopOnly": true
