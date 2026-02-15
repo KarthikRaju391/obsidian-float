@@ -1,15 +1,25 @@
 import { Plugin } from 'obsidian';
 
+function getHighlightContainer(el: HTMLElement): HTMLElement | null {
+	return (el.closest('p, li, blockquote, td, th') as HTMLElement | null) ?? el.parentElement;
+}
+
 export default class FloatHighlightsPlugin extends Plugin {
 	onload() {
 		console.log("loading plugin");
 
 		const highlightObserver = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
+				const target = entry.target as HTMLElement;
+				const container = getHighlightContainer(target);
+				if (!container) {
+					return;
+				}
+
 				if (entry.isIntersecting) {
-					entry.target.parentElement?.classList.add("float-highlights");
+					container.classList.add("float-highlights");
 				} else {
-					entry.target.parentElement?.classList.remove("float-highlights");
+					container.classList.remove("float-highlights");
 				}
 			});
 		}, { threshold: 0.2 });
@@ -18,7 +28,10 @@ export default class FloatHighlightsPlugin extends Plugin {
 			const highlightElements = element.querySelectorAll("mark");
 			if (highlightElements) {
 				Array.from(highlightElements).forEach((el) => {
-					highlightObserver.observe(el)
+					const mark = el as HTMLElement;
+					if (getHighlightContainer(mark)) {
+						highlightObserver.observe(mark);
+					}
 				});
 			}
 		});
