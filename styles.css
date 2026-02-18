@@ -8,11 +8,11 @@ If your plugin does not need CSS, delete this file.
 */
 
 .float-highlights {
-    transition: all var(--float-duration, 150ms) ease;
+    transition: transform var(--float-duration, 150ms) ease, box-shadow var(--float-duration, 150ms) ease;
     margin: 1em 0 1em 0 !important;
     box-shadow: rgba(0, 0, 0, 0.45) 0px 22px 53px 4px;
     border: 1px solid white;
-    padding: var(--float-padding, 1em) !important;
+    padding: 1em !important;
     border-radius: 0.5em;
     list-style-type: none;
 }
@@ -27,4 +27,24 @@ If your plugin does not need CSS, delete this file.
 
 .float-highlights[data-float-tag="em"] {
     transform: scale(var(--float-em-scale, 1.05));
+}
+
+/* Word-level animation: inline elements need inline-block for transforms */
+mark.float-highlights,
+strong.float-highlights,
+em.float-highlights {
+    display: inline-block;
+    margin: 0.2em 0 !important;
+    padding: 0.3em 0.5em !important;
+}
+
+/* Highlights keep their background color, no border */
+mark.float-highlights {
+    border: none;
+}
+
+/* Bold/italic get transparent background */
+strong.float-highlights,
+em.float-highlights {
+    background: transparent;
 }
