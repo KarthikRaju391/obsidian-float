@@ -17,7 +17,7 @@ This plugin enhances Obsidian reading mode by animating highlighted content as i
   - Animate bold/italic inside highlight blocks
 - Scroll performance improvements:
   - Transform-only highlight transition for smoother scrolling
-  - Ultra-smooth scrolling behavior that temporarily removes shadow while actively scrolling, then restores it when scrolling stops
+  - Ultra-smooth scrolling behaviour that temporarily removes shadow while actively scrolling, then restores it when scrolling stops
 
 ## Usage
 
@@ -40,6 +40,6 @@ This plugin enhances Obsidian reading mode by animating highlighted content as i
   - `... scale amount`
 
 ## Demo
+https://github.com/user-attachments/assets/f2d16605-17cb-42e2-aa62-fe7204d5af16
 
 
-https://user-images.githubusercontent.com/67912316/216141759-29c21316-cd09-4440-8b52-1b701cc8a99d.mp4
