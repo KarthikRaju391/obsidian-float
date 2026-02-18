@@ -35,6 +35,7 @@ function getHighlightContainer(el: HTMLElement): HTMLElement | null {
 export default class FloatHighlightsPlugin extends Plugin {
 	settings: FloatHighlightsSettings;
 	private observer: IntersectionObserver;
+	private scrollIdleTimer: number | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -43,6 +44,18 @@ export default class FloatHighlightsPlugin extends Plugin {
 
 		const observedContainers = new WeakSet<HTMLElement>();
 		let activeCount = 0;
+		const setScrollActive = () => {
+			document.body.classList.add('float-scroll-active');
+			if (this.scrollIdleTimer !== null) {
+				window.clearTimeout(this.scrollIdleTimer);
+			}
+			this.scrollIdleTimer = window.setTimeout(() => {
+				document.body.classList.remove('float-scroll-active');
+				this.scrollIdleTimer = null;
+			}, 120);
+		};
+
+		this.registerDomEvent(window, 'scroll', setScrollActive, { passive: true });
 
 		this.observer = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
@@ -62,7 +75,7 @@ export default class FloatHighlightsPlugin extends Plugin {
 					if (!animateTarget.classList.contains("float-highlights")) return;
 					animateTarget.classList.remove("float-highlights");
 					delete animateTarget.dataset.floatTag;
-					activeCount--;
+					activeCount = Math.max(0, activeCount - 1);
 					if (activeCount === 0) document.body.classList.remove("float-highlights-active");
 				}
 			});
@@ -92,6 +105,12 @@ export default class FloatHighlightsPlugin extends Plugin {
 
 	onunload() {
 		this.observer?.disconnect();
+		if (this.scrollIdleTimer !== null) {
+			window.clearTimeout(this.scrollIdleTimer);
+			this.scrollIdleTimer = null;
+		}
+		document.body.classList.remove('float-scroll-active');
+		document.body.classList.remove('float-highlights-active');
 	}
 
 	async loadSettings() {
