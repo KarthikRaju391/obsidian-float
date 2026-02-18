@@ -48,3 +48,9 @@ strong.float-highlights,
 em.float-highlights {
     background: transparent;
 }
+
+/* Dim non-highlighted content when highlights are active */
+body.float-highlights-active :is(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6, pre):not(.float-highlights):not(:has(.float-highlights)) {
+    opacity: var(--float-bg-opacity, 1);
+    transition: opacity var(--float-duration, 150ms) ease;
+}

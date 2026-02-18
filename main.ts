@@ -15,6 +15,7 @@ interface FloatHighlightsSettings {
 	animationDuration: number;
 	animateWordOnly: boolean;
 	animateInsideHighlight: boolean;
+	backgroundOpacity: number;
 }
 
 const DEFAULT_SETTINGS: FloatHighlightsSettings = {
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	animationDuration: 150,
 	animateWordOnly: false,
 	animateInsideHighlight: false,
+	backgroundOpacity: 1.0,
 };
 
 function getHighlightContainer(el: HTMLElement): HTMLElement | null {
@@ -40,6 +42,7 @@ export default class FloatHighlightsPlugin extends Plugin {
 		this.addSettingTab(new FloatHighlightsSettingTab(this.app, this));
 
 		const observedContainers = new WeakSet<HTMLElement>();
+		let activeCount = 0;
 
 		this.observer = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
@@ -53,10 +56,14 @@ export default class FloatHighlightsPlugin extends Plugin {
 					if (animateTarget.dataset.floatTag === tag) return;
 					animateTarget.classList.add("float-highlights");
 					animateTarget.dataset.floatTag = tag;
+					activeCount++;
+					if (activeCount === 1) document.body.classList.add("float-highlights-active");
 				} else {
 					if (!animateTarget.classList.contains("float-highlights")) return;
 					animateTarget.classList.remove("float-highlights");
 					delete animateTarget.dataset.floatTag;
+					activeCount--;
+					if (activeCount === 0) document.body.classList.remove("float-highlights-active");
 				}
 			});
 		}, { threshold: 0.2 });
@@ -96,6 +103,7 @@ export default class FloatHighlightsPlugin extends Plugin {
 			animationDuration: data.animationDuration ?? DEFAULT_SETTINGS.animationDuration,
 			animateWordOnly: data.animateWordOnly ?? DEFAULT_SETTINGS.animateWordOnly,
 			animateInsideHighlight: data.animateInsideHighlight ?? DEFAULT_SETTINGS.animateInsideHighlight,
+			backgroundOpacity: data.backgroundOpacity ?? DEFAULT_SETTINGS.backgroundOpacity,
 		};
 	}
 
@@ -110,6 +118,7 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-strong-scale', this.settings.strong.scaleAmount.toString());
 		body.style.setProperty('--float-em-scale', this.settings.em.scaleAmount.toString());
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
+		body.style.setProperty('--float-bg-opacity', this.settings.backgroundOpacity.toString());
 	}
 }
 
@@ -136,6 +145,18 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.animationDuration = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Background opacity')
+			.setDesc('Opacity of non-highlighted content when highlights are active (1.0 = no dimming)')
+			.addSlider(slider => slider
+				.setLimits(0.1, 1.0, 0.05)
+				.setValue(this.plugin.settings.backgroundOpacity)
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					this.plugin.settings.backgroundOpacity = value;
 					await this.plugin.saveSettings();
 				}));
 
