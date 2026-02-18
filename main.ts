@@ -35,15 +35,21 @@ function getHighlightContainer(el: HTMLElement): HTMLElement | null {
 export default class FloatHighlightsPlugin extends Plugin {
 	settings: FloatHighlightsSettings;
 	private observer: IntersectionObserver;
+	private domObserver: MutationObserver | null = null;
 	private scrollIdleTimer: number | null = null;
+	private observedTargets = new Set<HTMLElement>();
+	private observedTargetMeta = new WeakMap<HTMLElement, { insideHighlight: boolean }>();
+	private observedTargetTags = new WeakMap<HTMLElement, Set<SupportedTag>>();
+	private activeCount = 0;
+	private intersectingTargets = new Set<HTMLElement>();
+	private activeContributionByTarget = new WeakMap<HTMLElement, Map<SupportedTag, HTMLElement>>();
+	private activeTagsByContainer = new WeakMap<HTMLElement, Record<SupportedTag, number>>();
 
 	async onload() {
 		await this.loadSettings();
 		this.applyStyles();
 		this.addSettingTab(new FloatHighlightsSettingTab(this.app, this));
 
-		const observedContainers = new WeakSet<HTMLElement>();
-		let activeCount = 0;
 		const setScrollActive = () => {
 			document.body.classList.add('float-scroll-active');
 			if (this.scrollIdleTimer !== null) {
@@ -51,66 +57,51 @@ export default class FloatHighlightsPlugin extends Plugin {
 			}
 			this.scrollIdleTimer = window.setTimeout(() => {
 				document.body.classList.remove('float-scroll-active');
+				this.observeInActivePreviewRoots();
 				this.scrollIdleTimer = null;
 			}, 120);
 		};
 
+		// Obsidian scrolls inside pane containers, not always on window.
 		this.registerDomEvent(window, 'scroll', setScrollActive, { passive: true });
+		this.registerDomEvent(document, 'scroll', setScrollActive, { passive: true, capture: true });
 
 		this.observer = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
 				const target = entry.target as HTMLElement;
-				const animateTarget = this.settings.animateWordOnly
-					? target
-					: getHighlightContainer(target) ?? target;
-				const tag = target.tagName.toLowerCase();
+				const tags = this.observedTargetTags.get(target);
+				if (!tags || tags.size === 0) return;
 
 				if (entry.isIntersecting) {
-					if (animateTarget.dataset.floatTag === tag) return;
-					animateTarget.classList.add("float-highlights");
-					animateTarget.dataset.floatTag = tag;
-					activeCount++;
-					if (activeCount === 1) document.body.classList.add("float-highlights-active");
+					if (this.intersectingTargets.has(target)) return;
+					this.intersectingTargets.add(target);
+					tags.forEach((tag) => this.applyTargetTagContribution(target, tag));
 				} else {
-					if (!animateTarget.classList.contains("float-highlights")) return;
-					animateTarget.classList.remove("float-highlights");
-					delete animateTarget.dataset.floatTag;
-					activeCount = Math.max(0, activeCount - 1);
-					if (activeCount === 0) document.body.classList.remove("float-highlights-active");
+					if (!this.intersectingTargets.has(target)) return;
+					this.intersectingTargets.delete(target);
+					tags.forEach((tag) => this.removeTargetTagContribution(target, tag));
 				}
 			});
-		}, { threshold: 0.2 });
+		}, { threshold: 0.01 });
 
 		this.registerMarkdownPostProcessor((element) => {
-			const enabledTags = SUPPORTED_TAGS.filter(tag => this.settings[tag].enabled);
-			if (enabledTags.length === 0) return;
-
-			const selector = enabledTags.join(", ");
-			const matchedElements = element.querySelectorAll(selector);
-
-			matchedElements.forEach((el) => {
-				const htmlEl = el as HTMLElement;
-				// Skip bold/italic inside a highlight unless explicitly enabled
-				if (htmlEl.tagName !== 'MARK' && htmlEl.closest('mark') && !this.settings.animateInsideHighlight) {
-					return;
-				}
-				const container = this.settings.animateWordOnly ? htmlEl : getHighlightContainer(htmlEl);
-				if (container && !observedContainers.has(container)) {
-					observedContainers.add(container);
-					this.observer.observe(htmlEl);
-				}
-			});
+			this.observeInElement(element);
 		});
+		this.observeInActivePreviewRoots();
+		this.startDomObserver();
 	}
 
 	onunload() {
 		this.observer?.disconnect();
+		this.domObserver?.disconnect();
+		this.domObserver = null;
+		this.observedTargets.clear();
+		this.resetActiveHighlightState();
 		if (this.scrollIdleTimer !== null) {
 			window.clearTimeout(this.scrollIdleTimer);
 			this.scrollIdleTimer = null;
 		}
 		document.body.classList.remove('float-scroll-active');
-		document.body.classList.remove('float-highlights-active');
 	}
 
 	async loadSettings() {
@@ -131,6 +122,16 @@ export default class FloatHighlightsPlugin extends Plugin {
 		this.applyStyles();
 	}
 
+	refreshObservedHighlights() {
+		if (!this.observer) return;
+		this.observer.disconnect();
+		this.observedTargets.clear();
+		this.observedTargetMeta = new WeakMap<HTMLElement, { insideHighlight: boolean }>();
+		this.observedTargetTags = new WeakMap<HTMLElement, Set<SupportedTag>>();
+		this.resetActiveHighlightState();
+		this.observeInActivePreviewRoots();
+	}
+
 	private applyStyles(): void {
 		const body = document.body;
 		body.style.setProperty('--float-mark-scale', this.settings.mark.scaleAmount.toString());
@@ -138,6 +139,154 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-em-scale', this.settings.em.scaleAmount.toString());
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
 		body.style.setProperty('--float-bg-opacity', this.settings.backgroundOpacity.toString());
+	}
+
+	private observeInElement(root: Element): void {
+		this.observeTagInRoot(root, 'mark');
+		this.observeTagInRoot(root, 'strong');
+		this.observeTagInRoot(root, 'em');
+	}
+
+	private observeInActivePreviewRoots(): void {
+		const roots = this.getActivePreviewRoots();
+		roots.forEach((root) => this.observeInElement(root));
+	}
+
+	private startDomObserver(): void {
+		this.domObserver?.disconnect();
+		this.domObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (mutation.addedNodes.length === 0) continue;
+				mutation.addedNodes.forEach((node) => {
+					if (!(node instanceof Element)) return;
+					if (!node.closest('.markdown-preview-sizer, .markdown-preview-view, .markdown-rendered')
+						&& !node.matches('.markdown-preview-sizer, .markdown-preview-view, .markdown-rendered')) {
+						return;
+					}
+					if (node.matches('mark, strong, em')
+						|| node.querySelector('mark, strong, em')
+						|| node.matches('.markdown-preview-sizer, .markdown-preview-view, .markdown-rendered')) {
+						this.observeInElement(node);
+					}
+				});
+			}
+		});
+
+		this.domObserver.observe(document.body, { childList: true, subtree: true });
+	}
+
+	private getActivePreviewRoots(): Element[] {
+		const previewSizers = Array.from(document.querySelectorAll('.markdown-preview-sizer'));
+		if (previewSizers.length > 0) return previewSizers;
+		return Array.from(document.querySelectorAll('.markdown-preview-view, .markdown-rendered'));
+	}
+
+	private observeTagInRoot(root: Element, tag: SupportedTag): void {
+		root.querySelectorAll(tag).forEach((el) => {
+			const htmlEl = el as HTMLElement;
+			this.registerObservedTarget(htmlEl, tag);
+		});
+	}
+
+	private resetActiveHighlightState(): void {
+		this.activeCount = 0;
+		this.intersectingTargets.clear();
+		this.activeContributionByTarget = new WeakMap<HTMLElement, Map<SupportedTag, HTMLElement>>();
+		this.activeTagsByContainer = new WeakMap<HTMLElement, Record<SupportedTag, number>>();
+		document.body.classList.remove('float-highlights-active');
+		document.querySelectorAll('.float-highlights').forEach((el) => {
+			const htmlEl = el as HTMLElement;
+			htmlEl.classList.remove('float-highlights');
+			delete htmlEl.dataset.floatTag;
+		});
+	}
+
+	private incrementContainerTag(container: HTMLElement, tag: SupportedTag): void {
+		const counts = this.activeTagsByContainer.get(container) ?? { mark: 0, strong: 0, em: 0 };
+		counts[tag] += 1;
+		this.activeTagsByContainer.set(container, counts);
+		this.applyContainerTagState(container, counts);
+	}
+
+	private decrementContainerTag(container: HTMLElement, tag: SupportedTag): void {
+		const counts = this.activeTagsByContainer.get(container);
+		if (!counts) return;
+		counts[tag] = Math.max(0, counts[tag] - 1);
+		this.applyContainerTagState(container, counts);
+	}
+
+	private applyContainerTagState(container: HTMLElement, counts: Record<SupportedTag, number>): void {
+		const preferredTag = SUPPORTED_TAGS.find((tag) => counts[tag] > 0);
+		if (!preferredTag) {
+			if (!container.classList.contains('float-highlights')) return;
+			container.classList.remove('float-highlights');
+			delete container.dataset.floatTag;
+			this.activeCount = Math.max(0, this.activeCount - 1);
+			if (this.activeCount === 0) document.body.classList.remove('float-highlights-active');
+			return;
+		}
+
+		if (!container.classList.contains('float-highlights')) {
+			container.classList.add('float-highlights');
+			this.activeCount++;
+			if (this.activeCount === 1) document.body.classList.add('float-highlights-active');
+		}
+		container.dataset.floatTag = preferredTag;
+	}
+
+	private registerObservedTarget(target: HTMLElement, tag: SupportedTag): void {
+			const insideHighlight = tag !== 'mark' && !!target.closest('mark');
+			this.observedTargetMeta.set(target, { insideHighlight });
+		const existingTags = this.observedTargetTags.get(target);
+		if (existingTags) {
+			if (existingTags.has(tag)) return;
+			existingTags.add(tag);
+			// If target is already intersecting, apply newly added tag immediately.
+			if (this.intersectingTargets.has(target)) {
+				this.applyTargetTagContribution(target, tag);
+			}
+			return;
+		}
+
+		this.observedTargetTags.set(target, new Set<SupportedTag>([tag]));
+		if (!this.observedTargets.has(target)) {
+			this.observedTargets.add(target);
+			this.observer.observe(target);
+		}
+	}
+
+	private applyTargetTagContribution(target: HTMLElement, tag: SupportedTag): void {
+		if (!this.isTagEnabledForTarget(target, tag)) return;
+		const animateTarget = this.getAnimateTarget(target);
+		if (!animateTarget) return;
+
+		const contributions = this.activeContributionByTarget.get(target) ?? new Map<SupportedTag, HTMLElement>();
+		if (contributions.has(tag)) return;
+		contributions.set(tag, animateTarget);
+		this.activeContributionByTarget.set(target, contributions);
+		this.incrementContainerTag(animateTarget, tag);
+	}
+
+	private removeTargetTagContribution(target: HTMLElement, tag: SupportedTag): void {
+		const contributions = this.activeContributionByTarget.get(target);
+		if (!contributions) return;
+		const animateTarget = contributions.get(tag);
+		if (!animateTarget) return;
+		contributions.delete(tag);
+		this.decrementContainerTag(animateTarget, tag);
+	}
+
+	private getAnimateTarget(target: HTMLElement): HTMLElement | null {
+		return this.settings.animateWordOnly ? target : (getHighlightContainer(target) ?? target);
+	}
+
+	private isTagEnabledForTarget(target: HTMLElement, tag: SupportedTag): boolean {
+		if (!this.settings[tag].enabled) return false;
+		if (tag === 'mark') return true;
+		const meta = this.observedTargetMeta.get(target);
+		if (!meta) return false;
+		if (!meta.insideHighlight) return true;
+		return this.settings.animateInsideHighlight;
 	}
 }
 
@@ -187,6 +336,7 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.animateWordOnly = value;
 					await this.plugin.saveSettings();
+					this.plugin.refreshObservedHighlights();
 				}));
 
 		new Setting(containerEl)
@@ -197,6 +347,7 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.animateInsideHighlight = value;
 					await this.plugin.saveSettings();
+					this.plugin.refreshObservedHighlights();
 				}));
 
 		const tagLabels: Record<SupportedTag, { name: string; syntax: string }> = {
@@ -218,6 +369,7 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings[tag].enabled = value;
 						await this.plugin.saveSettings();
+						this.plugin.refreshObservedHighlights();
 					}));
 
 			new Setting(containerEl)
