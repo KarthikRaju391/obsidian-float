@@ -8,13 +8,18 @@ If your plugin does not need CSS, delete this file.
 */
 
 .float-highlights {
-    transition: transform var(--float-duration, 150ms) ease, box-shadow var(--float-duration, 150ms) ease;
+    transition: transform var(--float-duration, 150ms) ease;
     margin: 1em 0 1em 0 !important;
-    box-shadow: rgba(0, 0, 0, 0.45) 0px 22px 53px 4px;
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 12px 28px 2px;
     border: 1px solid white;
     padding: 1em !important;
     border-radius: 0.5em;
     list-style-type: none;
+}
+
+/* Ultra-smooth mode: remove expensive shadows while actively scrolling */
+body.float-scroll-active .float-highlights {
+    box-shadow: none;
 }
 
 .float-highlights[data-float-tag="mark"] {
