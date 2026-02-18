@@ -8,12 +8,23 @@ If your plugin does not need CSS, delete this file.
 */
 
 .float-highlights {
-    transition: all 150ms ease;
+    transition: all var(--float-duration, 150ms) ease;
     margin: 1em 0 1em 0 !important;
-    transform: scale(1.1);
     box-shadow: rgba(0, 0, 0, 0.45) 0px 22px 53px 4px;
     border: 1px solid white;
-    padding: 1em !important;
+    padding: var(--float-padding, 1em) !important;
     border-radius: 0.5em;
     list-style-type: none;
+}
+
+.float-highlights[data-float-tag="mark"] {
+    transform: scale(var(--float-mark-scale, 1.1));
+}
+
+.float-highlights[data-float-tag="strong"] {
+    transform: scale(var(--float-strong-scale, 1.08));
+}
+
+.float-highlights[data-float-tag="em"] {
+    transform: scale(var(--float-em-scale, 1.05));
 }
