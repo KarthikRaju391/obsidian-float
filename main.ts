@@ -13,7 +13,8 @@ interface FloatHighlightsSettings {
 	strong: TagSettings;
 	em: TagSettings;
 	animationDuration: number;
-	padding: number;
+	animateWordOnly: boolean;
+	animateInsideHighlight: boolean;
 }
 
 const DEFAULT_SETTINGS: FloatHighlightsSettings = {
@@ -21,7 +22,8 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	strong: { enabled: false, scaleAmount: 1.08 },
 	em: { enabled: false, scaleAmount: 1.05 },
 	animationDuration: 150,
-	padding: 1.0,
+	animateWordOnly: false,
+	animateInsideHighlight: false,
 };
 
 function getHighlightContainer(el: HTMLElement): HTMLElement | null {
@@ -37,18 +39,24 @@ export default class FloatHighlightsPlugin extends Plugin {
 		this.applyStyles();
 		this.addSettingTab(new FloatHighlightsSettingTab(this.app, this));
 
+		const observedContainers = new WeakSet<HTMLElement>();
+
 		this.observer = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
 				const target = entry.target as HTMLElement;
-				const container = getHighlightContainer(target);
-				if (!container) return;
+				const animateTarget = this.settings.animateWordOnly
+					? target
+					: getHighlightContainer(target) ?? target;
+				const tag = target.tagName.toLowerCase();
 
 				if (entry.isIntersecting) {
-					container.classList.add("float-highlights");
-					container.setAttribute("data-float-tag", target.tagName.toLowerCase());
+					if (animateTarget.dataset.floatTag === tag) return;
+					animateTarget.classList.add("float-highlights");
+					animateTarget.dataset.floatTag = tag;
 				} else {
-					container.classList.remove("float-highlights");
-					container.removeAttribute("data-float-tag");
+					if (!animateTarget.classList.contains("float-highlights")) return;
+					animateTarget.classList.remove("float-highlights");
+					delete animateTarget.dataset.floatTag;
 				}
 			});
 		}, { threshold: 0.2 });
@@ -62,7 +70,13 @@ export default class FloatHighlightsPlugin extends Plugin {
 
 			matchedElements.forEach((el) => {
 				const htmlEl = el as HTMLElement;
-				if (getHighlightContainer(htmlEl)) {
+				// Skip bold/italic inside a highlight unless explicitly enabled
+				if (htmlEl.tagName !== 'MARK' && htmlEl.closest('mark') && !this.settings.animateInsideHighlight) {
+					return;
+				}
+				const container = this.settings.animateWordOnly ? htmlEl : getHighlightContainer(htmlEl);
+				if (container && !observedContainers.has(container)) {
+					observedContainers.add(container);
 					this.observer.observe(htmlEl);
 				}
 			});
@@ -80,7 +94,8 @@ export default class FloatHighlightsPlugin extends Plugin {
 			strong: { ...DEFAULT_SETTINGS.strong, ...data.strong },
 			em: { ...DEFAULT_SETTINGS.em, ...data.em },
 			animationDuration: data.animationDuration ?? DEFAULT_SETTINGS.animationDuration,
-			padding: data.padding ?? DEFAULT_SETTINGS.padding,
+			animateWordOnly: data.animateWordOnly ?? DEFAULT_SETTINGS.animateWordOnly,
+			animateInsideHighlight: data.animateInsideHighlight ?? DEFAULT_SETTINGS.animateInsideHighlight,
 		};
 	}
 
@@ -95,7 +110,6 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-strong-scale', this.settings.strong.scaleAmount.toString());
 		body.style.setProperty('--float-em-scale', this.settings.em.scaleAmount.toString());
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
-		body.style.setProperty('--float-padding', `${this.settings.padding}em`);
 	}
 }
 
@@ -126,14 +140,22 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Block padding')
-			.setDesc('Padding around the animated block (in em units)')
-			.addSlider(slider => slider
-				.setLimits(0, 2, 0.1)
-				.setValue(this.plugin.settings.padding)
-				.setDynamicTooltip()
+			.setName('Animate word only')
+			.setDesc('Animate only the highlighted word instead of the entire text block')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.animateWordOnly)
 				.onChange(async (value) => {
-					this.plugin.settings.padding = value;
+					this.plugin.settings.animateWordOnly = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Animate bold/italic inside highlights')
+			.setDesc('Also animate bold/italic text that is inside a ==highlight== block')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.animateInsideHighlight)
+				.onChange(async (value) => {
+					this.plugin.settings.animateInsideHighlight = value;
 					await this.plugin.saveSettings();
 				}));
 
