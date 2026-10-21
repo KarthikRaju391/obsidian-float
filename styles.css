@@ -13,8 +13,13 @@ If your plugin does not need CSS, delete this file.
     box-shadow: rgba(0, 0, 0, 0.35) 0px 12px 28px 2px;
     border: 1px solid white;
     padding: 1em !important;
-    border-radius: 0.5em;
+    
+    /* Apply the customizable border radius from the plugin settings */
+    border-radius: var(--float-border-radius, 4px) !important; 
+    
     list-style-type: none;
+    /* Force the scale to grow from the center to prevent left-side clipping */
+    transform-origin: center center !important;
 }
 
 /* Ultra-smooth mode: remove expensive shadows while actively scrolling */
@@ -46,6 +51,7 @@ em.float-highlights {
 /* Highlights keep their background color, no border */
 mark.float-highlights {
     border: none;
+    background-color: var(--text-highlight-bg, #ffd54f) !important;
 }
 
 /* Bold/italic get transparent background */
@@ -58,4 +64,29 @@ em.float-highlights {
 body.float-highlights-active :is(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6, pre):not(.float-highlights):not(:has(.float-highlights)) {
     opacity: var(--float-bg-opacity, 1);
     transition: opacity var(--float-duration, 150ms) ease;
+}
+
+/* ============================================================
+   Fix: Scaled float-highlights are clipped inside callouts
+   ============================================================ */
+
+/* 1. Stop the Live Preview embed wrapper and Reading View from clipping */
+.cm-embed-block.cm-callout,
+.cm-embed-block.cm-callout .markdown-rendered,
+.callout,
+.callout-content,
+.callout-content p {
+    overflow: visible !important;
+    contain: none !important;
+}
+
+/* 2. Give text inside callouts room to wrap before scaling */
+.callout-content {
+    padding-right: 1.5em !important;
+    padding-left: 0.5em !important;
+}
+
+/* 3. Keep the main reading view from showing a horizontal scrollbar */
+.markdown-preview-sizer {
+    padding-right: 2em !important;
 }

@@ -16,6 +16,8 @@ interface FloatHighlightsSettings {
 	animateWordOnly: boolean;
 	animateInsideHighlight: boolean;
 	backgroundOpacity: number;
+	defaultHighlightColor: string;
+	borderRadius: number;
 }
 
 const DEFAULT_SETTINGS: FloatHighlightsSettings = {
@@ -26,6 +28,8 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	animateWordOnly: false,
 	animateInsideHighlight: false,
 	backgroundOpacity: 1.0,
+	defaultHighlightColor: '#fff0b5',
+	borderRadius: 4,
 };
 
 function getHighlightContainer(el: HTMLElement): HTMLElement | null {
@@ -114,6 +118,8 @@ export default class FloatHighlightsPlugin extends Plugin {
 			animateWordOnly: data.animateWordOnly ?? DEFAULT_SETTINGS.animateWordOnly,
 			animateInsideHighlight: data.animateInsideHighlight ?? DEFAULT_SETTINGS.animateInsideHighlight,
 			backgroundOpacity: data.backgroundOpacity ?? DEFAULT_SETTINGS.backgroundOpacity,
+			defaultHighlightColor: data.defaultHighlightColor ?? DEFAULT_SETTINGS.defaultHighlightColor,
+			borderRadius: data.borderRadius ?? DEFAULT_SETTINGS.borderRadius,
 		};
 	}
 
@@ -139,6 +145,10 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-em-scale', this.settings.em.scaleAmount.toString());
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
 		body.style.setProperty('--float-bg-opacity', this.settings.backgroundOpacity.toString());
+		
+		body.style.setProperty('--text-highlight-bg', this.settings.defaultHighlightColor);
+		
+		body.style.setProperty('--float-border-radius', `${this.settings.borderRadius}px`);
 	}
 
 	private observeInElement(root: Element): void {
@@ -325,6 +335,38 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.backgroundOpacity = value;
+					await this.plugin.saveSettings();
+				}));
+
+		containerEl.createEl('h3', { text: 'Highlight Appearance' });
+
+		new Setting(containerEl)
+			.setName('Default highlight color')
+			.setDesc('Color used for standard ==highlights== when no specific color is chosen')
+			.addColorPicker(color => color
+				.setValue(this.plugin.settings.defaultHighlightColor)
+				.onChange(async (value) => {
+					this.plugin.settings.defaultHighlightColor = value;
+					await this.plugin.saveSettings();
+				}))
+			.addExtraButton(button => button
+				.setIcon('reset')
+				.setTooltip('Reset to default yellow')
+				.onClick(async () => {
+					this.plugin.settings.defaultHighlightColor = DEFAULT_SETTINGS.defaultHighlightColor;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh the settings UI
+				}));
+
+		new Setting(containerEl)
+			.setName('Border radius')
+			.setDesc('How rounded the corners of the floating highlights should be')
+			.addSlider(slider => slider
+				.setLimits(0, 20, 1)
+				.setValue(this.plugin.settings.borderRadius)
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					this.plugin.settings.borderRadius = value;
 					await this.plugin.saveSettings();
 				}));
 
