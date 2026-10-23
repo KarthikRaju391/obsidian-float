@@ -30,7 +30,8 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	backgroundOpacity: 1.0,
 	// Empty means "use the theme's own highlight colour", so light and dark themes stay readable.
 	defaultHighlightColor: '',
-	borderRadius: 4,
+	// 8px matches the 0.5em corners used before this setting existed.
+	borderRadius: 8,
 };
 
 const MIN_BORDER_RADIUS = 0;
