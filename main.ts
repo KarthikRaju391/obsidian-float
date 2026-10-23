@@ -58,6 +58,18 @@ function getThemeHighlightHex(): string {
 	return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
 }
 
+// Every CSS variable applyStyles() writes on <body>, removed again on unload.
+const STYLE_VARIABLES = [
+	'--float-mark-scale',
+	'--float-strong-scale',
+	'--float-em-scale',
+	'--float-duration',
+	'--float-bg-opacity',
+	'--float-border-radius',
+	'--text-highlight-bg',
+	'--float-highlight-text',
+];
+
 function getHighlightContainer(el: HTMLElement): HTMLElement | null {
 	return (el.closest('p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6') as HTMLElement | null) ?? el.parentElement;
 }
@@ -131,7 +143,8 @@ export default class FloatHighlightsPlugin extends Plugin {
 			window.clearTimeout(this.scrollIdleTimer);
 			this.scrollIdleTimer = null;
 		}
-		document.body.classList.remove('float-scroll-active');
+		document.body.classList.remove('float-scroll-active', 'float-highlights-custom-color');
+		STYLE_VARIABLES.forEach((name) => document.body.style.removeProperty(name));
 	}
 
 	async loadSettings() {
