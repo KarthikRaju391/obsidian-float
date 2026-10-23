@@ -13,8 +13,13 @@ If your plugin does not need CSS, delete this file.
     box-shadow: rgba(0, 0, 0, 0.35) 0px 12px 28px 2px;
     border: 1px solid white;
     padding: 1em !important;
-    border-radius: 0.5em;
+    
+    /* Custom radius from the plugin settings; unset keeps the original 0.5em */
+    border-radius: var(--float-border-radius, 0.5em) !important;
+    
     list-style-type: none;
+    /* Force the scale to grow from the center to prevent left-side clipping */
+    transform-origin: center center !important;
 }
 
 /* Ultra-smooth mode: remove expensive shadows while actively scrolling */
@@ -48,6 +53,13 @@ mark.float-highlights {
     border: none;
 }
 
+/* Custom highlight colour: keep text readable on it. Native coloured and
+   inline-styled marks keep their own look. */
+body.float-highlights-custom-color .markdown-rendered mark:is(:not([data-highlight]), [data-highlight=""]):not([style*="background"]),
+body.float-highlights-custom-color .cm-s-obsidian span.cm-highlight:not([class*="cm-highlight-"]) {
+    color: var(--float-highlight-text);
+}
+
 /* Bold/italic get transparent background */
 strong.float-highlights,
 em.float-highlights {
@@ -58,4 +70,23 @@ em.float-highlights {
 body.float-highlights-active :is(p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6, pre):not(.float-highlights):not(:has(.float-highlights)) {
     opacity: var(--float-bg-opacity, 1);
     transition: opacity var(--float-duration, 150ms) ease;
+}
+
+/* ============================================================
+   Fix: Scaled float-highlights are clipped inside callouts
+   ============================================================ */
+
+/* Only while a callout or embedded note holds a floating card. Changing
+   overflow/contain moves nothing, so notes and callouts without a floating
+   card keep their layout, and wide tables or long links in callouts still
+   scroll. The Live Preview selector must outrank Obsidian's own
+   `contain: paint !important` on rendered widgets. */
+.callout:has(.float-highlights),
+.callout-content:has(.float-highlights),
+.markdown-source-view.mod-cm6 .cm-content > [contenteditable="false"]:has(.float-highlights),
+.markdown-source-view.mod-cm6 .cm-embed-block:has(.float-highlights) .markdown-rendered,
+.markdown-embed-content:has(.float-highlights),
+.markdown-embed-content:has(.float-highlights) > .markdown-preview-view {
+    overflow: visible !important;
+    contain: none !important;
 }

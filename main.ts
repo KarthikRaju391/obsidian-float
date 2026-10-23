@@ -16,6 +16,8 @@ interface FloatHighlightsSettings {
 	animateWordOnly: boolean;
 	animateInsideHighlight: boolean;
 	backgroundOpacity: number;
+	defaultHighlightColor: string;
+	borderRadius: number | null;
 }
 
 const DEFAULT_SETTINGS: FloatHighlightsSettings = {
@@ -26,7 +28,69 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	animateWordOnly: false,
 	animateInsideHighlight: false,
 	backgroundOpacity: 1.0,
+	// Empty means "use the theme's own highlight colour", so light and dark themes stay readable.
+	defaultHighlightColor: '',
+	// null keeps the original 0.5em corners, which scale with the text size (headings stay rounder).
+	borderRadius: null,
 };
+
+const MIN_BORDER_RADIUS = 0;
+const MAX_BORDER_RADIUS = 20;
+
+// Accept only #rgb / #rrggbb; anything else falls back to the theme colour ('').
+function sanitizeColor(value: unknown): string {
+	if (typeof value !== 'string') return '';
+	const hex = value.trim().toLowerCase();
+	if (/^#[0-9a-f]{6}$/.test(hex)) return hex;
+	if (/^#[0-9a-f]{3}$/.test(hex)) return '#' + hex.slice(1).split('').map((c) => c + c).join('');
+	return '';
+}
+
+// Whole pixels between MIN and MAX; anything else means "use the original 0.5em" (null).
+function clampBorderRadius(value: unknown): number | null {
+	const n = typeof value === 'number' ? value
+		: typeof value === 'string' && value.trim() !== '' ? Number(value)
+		: NaN;
+	if (!Number.isFinite(n)) return null;
+	return Math.min(MAX_BORDER_RADIUS, Math.max(MIN_BORDER_RADIUS, Math.round(n)));
+}
+
+// Pick black or white text, whichever reads better on a custom highlight colour.
+function getReadableTextColor(hex: string): string {
+	const channel = (i: number) => {
+		const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+		return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+	};
+	const luminance = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+	return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#ffffff';
+}
+
+// Resolve the theme's (often translucent) highlight colour to the opaque hex it looks like on the page.
+function getThemeHighlightHex(): string {
+	const style = getComputedStyle(document.body);
+	const ctx = createEl('canvas', { attr: { width: 1, height: 1 } }).getContext('2d');
+	if (!ctx) return '#000000';
+	ctx.fillStyle = style.getPropertyValue('--background-primary').trim() || '#ffffff';
+	ctx.fillRect(0, 0, 1, 1);
+	ctx.fillStyle = style.getPropertyValue('--text-highlight-bg').trim()
+		|| style.getPropertyValue('--highlight-background-yellow').trim()
+		|| '#ffff00';
+	ctx.fillRect(0, 0, 1, 1);
+	const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data);
+	return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+
+// Every CSS variable applyStyles() writes on <body>, removed again on unload.
+const STYLE_VARIABLES = [
+	'--float-mark-scale',
+	'--float-strong-scale',
+	'--float-em-scale',
+	'--float-duration',
+	'--float-bg-opacity',
+	'--float-border-radius',
+	'--text-highlight-bg',
+	'--float-highlight-text',
+];
 
 function getHighlightContainer(el: HTMLElement): HTMLElement | null {
 	return (el.closest('p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6') as HTMLElement | null) ?? el.parentElement;
@@ -101,7 +165,8 @@ export default class FloatHighlightsPlugin extends Plugin {
 			window.clearTimeout(this.scrollIdleTimer);
 			this.scrollIdleTimer = null;
 		}
-		document.body.classList.remove('float-scroll-active');
+		document.body.classList.remove('float-scroll-active', 'float-highlights-custom-color');
+		STYLE_VARIABLES.forEach((name) => document.body.style.removeProperty(name));
 	}
 
 	async loadSettings() {
@@ -114,6 +179,8 @@ export default class FloatHighlightsPlugin extends Plugin {
 			animateWordOnly: data.animateWordOnly ?? DEFAULT_SETTINGS.animateWordOnly,
 			animateInsideHighlight: data.animateInsideHighlight ?? DEFAULT_SETTINGS.animateInsideHighlight,
 			backgroundOpacity: data.backgroundOpacity ?? DEFAULT_SETTINGS.backgroundOpacity,
+			defaultHighlightColor: sanitizeColor(data.defaultHighlightColor),
+			borderRadius: clampBorderRadius(data.borderRadius),
 		};
 	}
 
@@ -139,6 +206,23 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-em-scale', this.settings.em.scaleAmount.toString());
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
 		body.style.setProperty('--float-bg-opacity', this.settings.backgroundOpacity.toString());
+		
+		if (this.settings.borderRadius === null) {
+			body.style.removeProperty('--float-border-radius');
+		} else {
+			body.style.setProperty('--float-border-radius', `${this.settings.borderRadius}px`);
+		}
+
+		const color = this.settings.defaultHighlightColor;
+		if (color) {
+			body.style.setProperty('--text-highlight-bg', color);
+			body.style.setProperty('--float-highlight-text', getReadableTextColor(color));
+			body.classList.add('float-highlights-custom-color');
+		} else {
+			body.style.removeProperty('--text-highlight-bg');
+			body.style.removeProperty('--float-highlight-text');
+			body.classList.remove('float-highlights-custom-color');
+		}
 	}
 
 	private observeInElement(root: Element): void {
@@ -326,6 +410,52 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.backgroundOpacity = value;
 					await this.plugin.saveSettings();
+				}));
+
+		containerEl.createEl('h3', { text: 'Highlight Appearance' });
+
+		new Setting(containerEl)
+			.setName('Default highlight color')
+			.setDesc(this.plugin.settings.defaultHighlightColor
+				? 'Color used for standard ==highlights==. Text on it switches to black or white so it stays readable.'
+				: 'Color used for standard ==highlights==. Currently following your theme.')
+			.addColorPicker(color => color
+				.setValue(this.plugin.settings.defaultHighlightColor || getThemeHighlightHex())
+				.onChange(async (value) => {
+					const color = sanitizeColor(value);
+					if (!color) return;
+					this.plugin.settings.defaultHighlightColor = color;
+					await this.plugin.saveSettings();
+				}))
+			.addExtraButton(button => button
+				.setIcon('reset')
+				.setTooltip('Reset to theme default')
+				.onClick(async () => {
+					this.plugin.settings.defaultHighlightColor = DEFAULT_SETTINGS.defaultHighlightColor;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh the settings UI
+				}));
+
+		new Setting(containerEl)
+			.setName('Border radius')
+			.setDesc(this.plugin.settings.borderRadius === null
+				? 'How rounded the corners of the floating highlights should be (default: 0.5em, scales with text size)'
+				: 'How rounded the corners of the floating highlights should be')
+			.addSlider(slider => slider
+				.setLimits(MIN_BORDER_RADIUS, MAX_BORDER_RADIUS, 1)
+				.setValue(this.plugin.settings.borderRadius ?? 8)
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					this.plugin.settings.borderRadius = clampBorderRadius(value);
+					await this.plugin.saveSettings();
+				}))
+			.addExtraButton(button => button
+				.setIcon('reset')
+				.setTooltip('Reset to default (0.5em)')
+				.onClick(async () => {
+					this.plugin.settings.borderRadius = DEFAULT_SETTINGS.borderRadius;
+					await this.plugin.saveSettings();
+					this.display();
 				}));
 
 		new Setting(containerEl)
