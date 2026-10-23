@@ -33,6 +33,27 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	borderRadius: 4,
 };
 
+const MIN_BORDER_RADIUS = 0;
+const MAX_BORDER_RADIUS = 20;
+
+// Accept only #rgb / #rrggbb; anything else falls back to the theme colour ('').
+function sanitizeColor(value: unknown): string {
+	if (typeof value !== 'string') return '';
+	const hex = value.trim().toLowerCase();
+	if (/^#[0-9a-f]{6}$/.test(hex)) return hex;
+	if (/^#[0-9a-f]{3}$/.test(hex)) return '#' + hex.slice(1).split('').map((c) => c + c).join('');
+	return '';
+}
+
+// Whole pixels between MIN and MAX; non-numbers fall back to the default.
+function clampBorderRadius(value: unknown): number {
+	const n = typeof value === 'number' ? value
+		: typeof value === 'string' && value.trim() !== '' ? Number(value)
+		: NaN;
+	if (!Number.isFinite(n)) return DEFAULT_SETTINGS.borderRadius;
+	return Math.min(MAX_BORDER_RADIUS, Math.max(MIN_BORDER_RADIUS, Math.round(n)));
+}
+
 // Pick black or white text, whichever reads better on a custom highlight colour.
 function getReadableTextColor(hex: string): string {
 	const channel = (i: number) => {
@@ -157,8 +178,8 @@ export default class FloatHighlightsPlugin extends Plugin {
 			animateWordOnly: data.animateWordOnly ?? DEFAULT_SETTINGS.animateWordOnly,
 			animateInsideHighlight: data.animateInsideHighlight ?? DEFAULT_SETTINGS.animateInsideHighlight,
 			backgroundOpacity: data.backgroundOpacity ?? DEFAULT_SETTINGS.backgroundOpacity,
-			defaultHighlightColor: data.defaultHighlightColor ?? DEFAULT_SETTINGS.defaultHighlightColor,
-			borderRadius: data.borderRadius ?? DEFAULT_SETTINGS.borderRadius,
+			defaultHighlightColor: sanitizeColor(data.defaultHighlightColor),
+			borderRadius: clampBorderRadius(data.borderRadius),
 		};
 	}
 
@@ -396,7 +417,9 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 			.addColorPicker(color => color
 				.setValue(this.plugin.settings.defaultHighlightColor || getThemeHighlightHex())
 				.onChange(async (value) => {
-					this.plugin.settings.defaultHighlightColor = value;
+					const color = sanitizeColor(value);
+					if (!color) return;
+					this.plugin.settings.defaultHighlightColor = color;
 					await this.plugin.saveSettings();
 				}))
 			.addExtraButton(button => button
@@ -412,11 +435,11 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 			.setName('Border radius')
 			.setDesc('How rounded the corners of the floating highlights should be')
 			.addSlider(slider => slider
-				.setLimits(0, 20, 1)
+				.setLimits(MIN_BORDER_RADIUS, MAX_BORDER_RADIUS, 1)
 				.setValue(this.plugin.settings.borderRadius)
 				.setDynamicTooltip()
 				.onChange(async (value) => {
-					this.plugin.settings.borderRadius = value;
+					this.plugin.settings.borderRadius = clampBorderRadius(value);
 					await this.plugin.saveSettings();
 				}));
 
