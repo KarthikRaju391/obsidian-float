@@ -77,23 +77,17 @@ body.float-highlights-active :is(p, li, blockquote, td, th, h1, h2, h3, h4, h5, 
    Fix: Scaled float-highlights are clipped inside callouts
    ============================================================ */
 
-/* 1. Stop the Live Preview embed wrapper and Reading View from clipping */
-.cm-embed-block.cm-callout,
-.cm-embed-block.cm-callout .markdown-rendered,
-.callout,
-.callout-content,
-.callout-content p {
+/* Only while a callout or embedded note holds a floating card. Changing
+   overflow/contain moves nothing, so notes and callouts without a floating
+   card keep their layout, and wide tables or long links in callouts still
+   scroll. The Live Preview selector must outrank Obsidian's own
+   `contain: paint !important` on rendered widgets. */
+.callout:has(.float-highlights),
+.callout-content:has(.float-highlights),
+.markdown-source-view.mod-cm6 .cm-content > [contenteditable="false"]:has(.float-highlights),
+.markdown-source-view.mod-cm6 .cm-embed-block:has(.float-highlights) .markdown-rendered,
+.markdown-embed-content:has(.float-highlights),
+.markdown-embed-content:has(.float-highlights) > .markdown-preview-view {
     overflow: visible !important;
     contain: none !important;
-}
-
-/* 2. Give text inside callouts room to wrap before scaling */
-.callout-content {
-    padding-right: 1.5em !important;
-    padding-left: 0.5em !important;
-}
-
-/* 3. Keep the main reading view from showing a horizontal scrollbar */
-.markdown-preview-sizer {
-    padding-right: 2em !important;
 }
