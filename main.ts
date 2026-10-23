@@ -17,7 +17,7 @@ interface FloatHighlightsSettings {
 	animateInsideHighlight: boolean;
 	backgroundOpacity: number;
 	defaultHighlightColor: string;
-	borderRadius: number;
+	borderRadius: number | null;
 }
 
 const DEFAULT_SETTINGS: FloatHighlightsSettings = {
@@ -30,8 +30,8 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	backgroundOpacity: 1.0,
 	// Empty means "use the theme's own highlight colour", so light and dark themes stay readable.
 	defaultHighlightColor: '',
-	// 8px matches the 0.5em corners used before this setting existed.
-	borderRadius: 8,
+	// null keeps the original 0.5em corners, which scale with the text size (headings stay rounder).
+	borderRadius: null,
 };
 
 const MIN_BORDER_RADIUS = 0;
@@ -46,12 +46,12 @@ function sanitizeColor(value: unknown): string {
 	return '';
 }
 
-// Whole pixels between MIN and MAX; non-numbers fall back to the default.
-function clampBorderRadius(value: unknown): number {
+// Whole pixels between MIN and MAX; anything else means "use the original 0.5em" (null).
+function clampBorderRadius(value: unknown): number | null {
 	const n = typeof value === 'number' ? value
 		: typeof value === 'string' && value.trim() !== '' ? Number(value)
 		: NaN;
-	if (!Number.isFinite(n)) return DEFAULT_SETTINGS.borderRadius;
+	if (!Number.isFinite(n)) return null;
 	return Math.min(MAX_BORDER_RADIUS, Math.max(MIN_BORDER_RADIUS, Math.round(n)));
 }
 
@@ -207,7 +207,11 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
 		body.style.setProperty('--float-bg-opacity', this.settings.backgroundOpacity.toString());
 		
-		body.style.setProperty('--float-border-radius', `${this.settings.borderRadius}px`);
+		if (this.settings.borderRadius === null) {
+			body.style.removeProperty('--float-border-radius');
+		} else {
+			body.style.setProperty('--float-border-radius', `${this.settings.borderRadius}px`);
+		}
 
 		const color = this.settings.defaultHighlightColor;
 		if (color) {
@@ -434,14 +438,24 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Border radius')
-			.setDesc('How rounded the corners of the floating highlights should be')
+			.setDesc(this.plugin.settings.borderRadius === null
+				? 'How rounded the corners of the floating highlights should be (default: 0.5em, scales with text size)'
+				: 'How rounded the corners of the floating highlights should be')
 			.addSlider(slider => slider
 				.setLimits(MIN_BORDER_RADIUS, MAX_BORDER_RADIUS, 1)
-				.setValue(this.plugin.settings.borderRadius)
+				.setValue(this.plugin.settings.borderRadius ?? 8)
 				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.borderRadius = clampBorderRadius(value);
 					await this.plugin.saveSettings();
+				}))
+			.addExtraButton(button => button
+				.setIcon('reset')
+				.setTooltip('Reset to default (0.5em)')
+				.onClick(async () => {
+					this.plugin.settings.borderRadius = DEFAULT_SETTINGS.borderRadius;
+					await this.plugin.saveSettings();
+					this.display();
 				}));
 
 		new Setting(containerEl)

@@ -41,7 +41,7 @@ This plugin enhances Obsidian reading mode by animating highlighted content as i
   - `Animate bold/italic inside highlights`
 - Highlight Appearance:
   - `Default highlight color`: by default the plugin uses your theme's highlight colour, so highlights stay readable in light and dark themes. Pick a colour to override it (highlighted text then switches to black or white, whichever is easier to read); the reset button goes back to the theme colour. Obsidian's own coloured highlights and highlights coloured with inline HTML (`<mark style="background: ...">`) keep their colour.
-  - `Border radius`: corner radius of the floating card, 0–20px (default 8px)
+  - `Border radius`: corner radius of the floating card, 0–20px; default keeps the original 0.5em, which scales with text size
 - Per tag (Highlights, Bold, Italic):
   - `Enable ... float`
   - `... scale amount`

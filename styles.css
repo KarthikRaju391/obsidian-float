@@ -14,8 +14,8 @@ If your plugin does not need CSS, delete this file.
     border: 1px solid white;
     padding: 1em !important;
     
-    /* Apply the customizable border radius from the plugin settings */
-    border-radius: var(--float-border-radius, 8px) !important;
+    /* Custom radius from the plugin settings; unset keeps the original 0.5em */
+    border-radius: var(--float-border-radius, 0.5em) !important;
     
     list-style-type: none;
     /* Force the scale to grow from the center to prevent left-side clipping */
