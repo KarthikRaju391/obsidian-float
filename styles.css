@@ -51,7 +51,6 @@ em.float-highlights {
 /* Highlights keep their background color, no border */
 mark.float-highlights {
     border: none;
-    background-color: var(--text-highlight-bg, #ffd54f) !important;
 }
 
 /* Custom highlight colour: keep text readable on it. Native coloured and
