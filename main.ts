@@ -28,9 +28,35 @@ const DEFAULT_SETTINGS: FloatHighlightsSettings = {
 	animateWordOnly: false,
 	animateInsideHighlight: false,
 	backgroundOpacity: 1.0,
-	defaultHighlightColor: '#fff0b5',
+	// Empty means "use the theme's own highlight colour", so light and dark themes stay readable.
+	defaultHighlightColor: '',
 	borderRadius: 4,
 };
+
+// Pick black or white text, whichever reads better on a custom highlight colour.
+function getReadableTextColor(hex: string): string {
+	const channel = (i: number) => {
+		const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+		return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+	};
+	const luminance = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+	return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#ffffff';
+}
+
+// Resolve the theme's (often translucent) highlight colour to the opaque hex it looks like on the page.
+function getThemeHighlightHex(): string {
+	const style = getComputedStyle(document.body);
+	const ctx = createEl('canvas', { attr: { width: 1, height: 1 } }).getContext('2d');
+	if (!ctx) return '#000000';
+	ctx.fillStyle = style.getPropertyValue('--background-primary').trim() || '#ffffff';
+	ctx.fillRect(0, 0, 1, 1);
+	ctx.fillStyle = style.getPropertyValue('--text-highlight-bg').trim()
+		|| style.getPropertyValue('--highlight-background-yellow').trim()
+		|| '#ffff00';
+	ctx.fillRect(0, 0, 1, 1);
+	const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data);
+	return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+}
 
 function getHighlightContainer(el: HTMLElement): HTMLElement | null {
 	return (el.closest('p, li, blockquote, td, th, h1, h2, h3, h4, h5, h6') as HTMLElement | null) ?? el.parentElement;
@@ -146,9 +172,18 @@ export default class FloatHighlightsPlugin extends Plugin {
 		body.style.setProperty('--float-duration', `${this.settings.animationDuration}ms`);
 		body.style.setProperty('--float-bg-opacity', this.settings.backgroundOpacity.toString());
 		
-		body.style.setProperty('--text-highlight-bg', this.settings.defaultHighlightColor);
-		
 		body.style.setProperty('--float-border-radius', `${this.settings.borderRadius}px`);
+
+		const color = this.settings.defaultHighlightColor;
+		if (color) {
+			body.style.setProperty('--text-highlight-bg', color);
+			body.style.setProperty('--float-highlight-text', getReadableTextColor(color));
+			body.classList.add('float-highlights-custom-color');
+		} else {
+			body.style.removeProperty('--text-highlight-bg');
+			body.style.removeProperty('--float-highlight-text');
+			body.classList.remove('float-highlights-custom-color');
+		}
 	}
 
 	private observeInElement(root: Element): void {
@@ -342,16 +377,18 @@ class FloatHighlightsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Default highlight color')
-			.setDesc('Color used for standard ==highlights== when no specific color is chosen')
+			.setDesc(this.plugin.settings.defaultHighlightColor
+				? 'Color used for standard ==highlights==. Text on it switches to black or white so it stays readable.'
+				: 'Color used for standard ==highlights==. Currently following your theme.')
 			.addColorPicker(color => color
-				.setValue(this.plugin.settings.defaultHighlightColor)
+				.setValue(this.plugin.settings.defaultHighlightColor || getThemeHighlightHex())
 				.onChange(async (value) => {
 					this.plugin.settings.defaultHighlightColor = value;
 					await this.plugin.saveSettings();
 				}))
 			.addExtraButton(button => button
 				.setIcon('reset')
-				.setTooltip('Reset to default yellow')
+				.setTooltip('Reset to theme default')
 				.onClick(async () => {
 					this.plugin.settings.defaultHighlightColor = DEFAULT_SETTINGS.defaultHighlightColor;
 					await this.plugin.saveSettings();

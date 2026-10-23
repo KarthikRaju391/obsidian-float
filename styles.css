@@ -54,6 +54,13 @@ mark.float-highlights {
     background-color: var(--text-highlight-bg, #ffd54f) !important;
 }
 
+/* Custom highlight colour: keep text readable on it. Native coloured and
+   inline-styled marks keep their own look. */
+body.float-highlights-custom-color .markdown-rendered mark:is(:not([data-highlight]), [data-highlight=""]):not([style*="background"]),
+body.float-highlights-custom-color .cm-s-obsidian span.cm-highlight:not([class*="cm-highlight-"]) {
+    color: var(--float-highlight-text);
+}
+
 /* Bold/italic get transparent background */
 strong.float-highlights,
 em.float-highlights {
